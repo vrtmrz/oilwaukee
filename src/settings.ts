@@ -1,18 +1,18 @@
 import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import OilwaukeePlugin from "./main";
 
-export interface MyPluginSettings {
+export interface OilwaukeeSettings {
 	mySetting: string;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
+export const DEFAULT_SETTINGS: OilwaukeeSettings = {
 	mySetting: 'default'
 }
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class OilwaukeeSettingTab extends PluginSettingTab {
+	plugin: OilwaukeePlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: OilwaukeePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}

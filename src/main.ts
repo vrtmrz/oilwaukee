@@ -1,80 +1,87 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Editor, MarkdownView, Notice, Plugin, type TFile } from 'obsidian';
+import { DEFAULT_SETTINGS, OilwaukeeSettings } from "./settings";
 
 // Remember to rename these classes and interfaces!
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class OilwaukeePlugin extends Plugin {
+	settings: OilwaukeeSettings;
 
+	async commandTagsToFrontmatter() {
+		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!markdownView) {
+			new Notice('No active Markdown view found.');
+			return;
+		}
+		const file = markdownView.file;
+		if (!file) {
+			new Notice('No file associated with the active Markdown view.');
+			return;
+		}
+		const cache = this.app.metadataCache.getFileCache(file);
+		if (!cache) {
+			new Notice('No metadata cache found for the file.');
+			return;
+		}
+		const frontMatterTags = cache.frontmatter?.tags as string[] || [];
+		const tags = cache.tags?.map(tag => tag.tag) || [];
+		const newTags = tags.filter(tag => !frontMatterTags.includes(tag));
+		await this.tagsToFrontmatter(file, newTags);
+	}
+	async tagsToFrontmatter(file: TFile, newTags: string[]) {
+		await this.app.fileManager.processFrontMatter(file, (frontMatter: Record<string, unknown> | undefined) => {
+			if (!frontMatter || typeof frontMatter !== 'object') {
+				frontMatter = {};
+			}
+			const tagsInFrontMatter = frontMatter["tags"] as string[] || [];
+			frontMatter["tags"] = Array.from(new Set([...tagsInFrontMatter, ...newTags]));
+		});
+	}
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
+			id: 'tags-to-frontmatter',
+			name: 'Tags to the frontmatter',
+			callback: async () => {
+				await this.commandTagsToFrontmatter();
 			}
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+			id: "selected-tags-to-frontmatter",
+			name: "Tags from selected text to the frontmatter",
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				const file = view.file;
+				if (!file) {
+					new Notice('No file associated with the active Markdown view.');
+					return;
 				}
-				return false;
+				const cache = this.app.metadataCache.getFileCache(file);
+				if (!cache) {
+					new Notice('No metadata cache found for the file.');
+					return;
+				}
+				const tags = cache.tags?.map(tag => tag.tag) || [];
+				const selectedText = editor.getSelection();
+				const selectedTags = tags.filter(tag => selectedText.includes(tag));
+				if (selectedTags.length === 0) {
+					new Notice('No tags found in the selected text.');
+					return;
+				}
+				await this.tagsToFrontmatter(file, selectedTags);
+				// Remove the selected tags from the editor
+				const newText = selectedText.split(' ').filter(word => !selectedTags.includes(word)).join(' ');
+				editor.replaceSelection(newText);
+				new Notice('Selected tags moved to frontmatter.');
 			}
 		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
 	}
 
 	onunload() {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<OilwaukeeSettings>);
 	}
 
 	async saveSettings() {
@@ -82,18 +89,18 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+// class SampleModal extends Modal {
+// 	constructor(app: App) {
+// 		super(app);
+// 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+// 	onOpen() {
+// 		let { contentEl } = this;
+// 		contentEl.setText('Woah!');
+// 	}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
+// 	onClose() {
+// 		const { contentEl } = this;
+// 		contentEl.empty();
+// 	}
+// }
