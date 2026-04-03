@@ -1,6 +1,6 @@
 {
 	"name": "oilwaukee",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "Things like milwaukee's for Obsidian",
 	"main": "main.js",
 	"type": "module",
