@@ -1,10 +1,10 @@
-import { Editor, MarkdownView, Notice, Plugin, type TFile } from 'obsidian';
+import { Editor, MarkdownView, Notice, Plugin, type MarkdownFileInfo, type TFile } from 'obsidian';
 import { DEFAULT_SETTINGS, OilwaukeeSettings } from "./settings";
 
 // Remember to rename these classes and interfaces!
 
 export default class OilwaukeePlugin extends Plugin {
-	settings: OilwaukeeSettings;
+	settings: OilwaukeeSettings = DEFAULT_SETTINGS;
 
 	async commandTagsToFrontmatter() {
 		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -47,10 +47,47 @@ export default class OilwaukeePlugin extends Plugin {
 				await this.commandTagsToFrontmatter();
 			}
 		});
+
+		this.addCommand({
+			name: "Move tags from the first line to the frontmatter",
+			id: "first-line-tags-to-frontmatter",
+			editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				const file = view.file;
+				if (!file) {
+					new Notice('No file associated with the active Markdown view.');
+					return;
+				}
+				const cache = this.app.metadataCache.getFileCache(file);
+				if (!cache) {
+					new Notice('No metadata cache found for the file.');
+					return;
+				}
+				const firstLineNumber = (cache.frontmatterPosition?.end?.line ?? -1) + 1;
+				const firstLine = editor.getLine(firstLineNumber);
+				const tagsAll = cache.tags?.map(tag => tag.tag) || [];
+
+				const newTags = tagsAll.filter(tag => firstLine.includes(tag));
+				if (newTags.length === 0) {
+					new Notice('No tags found in the first line.');
+					return;
+				}
+				// Move the tags to the frontmatter
+
+				await this.tagsToFrontmatter(file, newTags);
+				// Remove the first line from the editor
+				const newFirstLine = firstLine.split(' ').filter(word => !newTags.includes(word)).join(' ');
+				if (newFirstLine.trim() === '') {
+					editor.setLine(firstLineNumber, '');
+				} else {
+					editor.setLine(firstLineNumber, newFirstLine);
+				}
+				new Notice('Tags from the first line moved to frontmatter.');
+			}
+		})
 		this.addCommand({
 			id: "selected-tags-to-frontmatter",
 			name: "Tags from selected text to the frontmatter",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
+			editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				const file = view.file;
 				if (!file) {
 					new Notice('No file associated with the active Markdown view.');

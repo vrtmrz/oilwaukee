@@ -14,6 +14,7 @@ plugins, if we look well, Just only I have none of them in my toolbox.
 
 - Tags to the frontmatter
 - Tags from selected text to the frontmatter
+- Move tags from the first line to the frontmatter 
 
 ## License
 
